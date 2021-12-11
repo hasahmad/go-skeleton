@@ -38,7 +38,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.models.Movies.Insert(movie)
+	err = app.models.Movies.Insert(r.Context(), movie)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -60,7 +60,7 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	movie, err := app.models.Movies.Get(id)
+	movie, err := app.models.Movies.Get(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -84,7 +84,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	movie, err := app.models.Movies.Get(id)
+	movie, err := app.models.Movies.Get(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -128,7 +128,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.models.Movies.Update(movie)
+	err = app.models.Movies.Update(r.Context(), movie)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
@@ -152,7 +152,7 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = app.models.Movies.Delete(id)
+	err = app.models.Movies.Delete(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):

@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -52,7 +53,7 @@ func NewMovieModel(db *sqlx.DB) MovieModel {
 	}
 }
 
-func (m *MovieModel) Insert(movie *Movie) error {
+func (m *MovieModel) Insert(ctx context.Context, movie *Movie) error {
 	query, args, err := goqu.
 		Insert(m.tableName).
 		Rows(map[string]interface{}{
@@ -69,10 +70,10 @@ func (m *MovieModel) Insert(movie *Movie) error {
 		return err
 	}
 
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
-func (m *MovieModel) Get(id int64) (*Movie, error) {
+func (m *MovieModel) Get(ctx context.Context, id int64) (*Movie, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}
@@ -87,7 +88,7 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	var movie Movie
-	err = m.DB.Get(&movie, query, args...)
+	err = m.DB.GetContext(ctx, &movie, query, args...)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -100,7 +101,7 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 	return &movie, nil
 }
 
-func (m *MovieModel) Update(movie *Movie) error {
+func (m *MovieModel) Update(ctx context.Context, movie *Movie) error {
 	query, args, err := goqu.
 		Update(m.tableName).
 		Set(map[string]interface{}{
@@ -122,7 +123,7 @@ func (m *MovieModel) Update(movie *Movie) error {
 		return err
 	}
 
-	err = m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	err = m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -135,7 +136,7 @@ func (m *MovieModel) Update(movie *Movie) error {
 	return nil
 }
 
-func (m *MovieModel) Delete(id int64) error {
+func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}
@@ -153,7 +154,7 @@ func (m *MovieModel) Delete(id int64) error {
 		return err
 	}
 
-	result, err := m.DB.Exec(query, args...)
+	result, err := m.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
