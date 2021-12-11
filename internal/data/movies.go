@@ -5,19 +5,20 @@ import (
 	"errors"
 	"time"
 
+	"github.com/doug-martin/goqu/v9"
 	"github.com/hasahmad/greenlight/internal/validator"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
 type Movie struct {
-	ID        int64     `json:"id"`
-	CreatedAt time.Time `json:"-"`
-	Title     string    `json:"title"`
-	Year      int32     `json:"year,omitempty"`
-	Runtime   Runtime   `json:"runtime,omitempty"`
-	Genres    []string  `json:"genres,omitempty"`
-	Version   int32     `json:"version"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        int64          `json:"id" db:"id"`
+	CreatedAt time.Time      `json:"-" db:"created_at"`
+	Title     string         `json:"title" db:"title"`
+	Year      int32          `json:"year,omitempty" db:"year"`
+	Runtime   Runtime        `json:"runtime,omitempty" db:"runtime"`
+	Genres    pq.StringArray `json:"genres,omitempty" db:"genres"`
+	Version   int32          `json:"version" db:"version"`
 }
 
 func ValidateMovie(v *validator.Validator, movie *Movie) {
@@ -38,7 +39,15 @@ func ValidateMovie(v *validator.Validator, movie *Movie) {
 }
 
 type MovieModel struct {
-	DB *sql.DB
+	DB        *sqlx.DB
+	tableName string
+}
+
+func NewMovieModel(db *sqlx.DB) MovieModel {
+	return MovieModel{
+		DB:        db,
+		tableName: "movies",
+	}
 }
 
 func (m *MovieModel) Insert(movie *Movie) error {
@@ -57,22 +66,17 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 		return nil, ErrRecordNotFound
 	}
 
-	query := `
-		SELECT id, created_at, title, year, runtime, genres, version
-		FROM movies
-		WHERE id = $1`
+	query, args, err := goqu.
+		Select("*").
+		From(m.tableName).
+		Where(goqu.Ex{"id": id}).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	var movie Movie
-	err := m.DB.QueryRow(query, id).Scan(
-		&movie.ID,
-		&movie.CreatedAt,
-		&movie.Title,
-		&movie.Year,
-		&movie.Runtime,
-		pq.Array(&movie.Genres),
-		&movie.Version,
-	)
-
+	err = m.DB.Get(&movie, query, args...)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -86,22 +90,26 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 }
 
 func (m *MovieModel) Update(movie *Movie) error {
-	query := `
-		UPDATE movies 
-		SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
-		WHERE id = $5 AND version = $6
-		RETURNING version`
-
-	args := []interface{}{
-		movie.Title,
-		movie.Year,
-		movie.Runtime,
-		pq.Array(movie.Genres),
-		movie.ID,
-		movie.Version,
+	query, args, err := goqu.
+		Update(m.tableName).
+		Set(map[string]interface{}{
+			"title":   movie.Title,
+			"year":    movie.Year,
+			"runtime": movie.Runtime,
+			"genres":  movie.Genres,
+			"version": movie.Version + 1,
+		}).
+		Where(goqu.Ex{
+			"id":      movie.ID,
+			"version": movie.Version,
+		}).
+		Returning("version").
+		ToSQL()
+	if err != nil {
+		return err
 	}
 
-	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	err = m.DB.QueryRow(query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -119,11 +127,17 @@ func (m *MovieModel) Delete(id int64) error {
 		return ErrRecordNotFound
 	}
 
-	query := `
-		DELETE FROM movies
-		WHERE id = $1`
+	query, args, err := goqu.
+		Delete(m.tableName).
+		Where(goqu.Ex{
+			"id": id,
+		}).
+		ToSQL()
+	if err != nil {
+		return err
+	}
 
-	result, err := m.DB.Exec(query, id)
+	result, err := m.DB.Exec(query, args...)
 	if err != nil {
 		return err
 	}

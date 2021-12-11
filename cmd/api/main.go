@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hasahmad/greenlight/internal/data"
+	"github.com/jmoiron/sqlx"
 
 	// Import the pq driver so that it can register itself with the database/sql
 	// package.
@@ -79,8 +79,8 @@ func main() {
 	logger.Fatal(err)
 }
 
-func openDB(cfg config) (*sql.DB, error) {
-	db, err := sql.Open("postgres", cfg.db.dsn)
+func openDB(cfg config) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", cfg.db.dsn)
 	if err != nil {
 		return nil, err
 	}
