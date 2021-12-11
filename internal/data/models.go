@@ -18,7 +18,7 @@ type TimeStampsModel struct {
 }
 
 type SoftDeletableTimeStampModel struct {
-	RemovedAt pq.NullTime `json:"created_at" db:"removed_at"`
+	RemovedAt pq.NullTime `json:"deleted_at" db:"deleted_at"`
 }
 
 type Models struct {
