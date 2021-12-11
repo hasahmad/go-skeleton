@@ -12,8 +12,10 @@ import (
 )
 
 type Movie struct {
+	TimeStampsModel
+	SoftDeletableTimeStampModel
 	ID        int64          `json:"id" db:"id"`
-	CreatedAt time.Time      `json:"-" db:"created_at"`
+	CreatedAt pq.NullTime    `json:"created_at" db:"created_at"`
 	Title     string         `json:"title" db:"title"`
 	Year      int32          `json:"year,omitempty" db:"year"`
 	Runtime   Runtime        `json:"runtime,omitempty" db:"runtime"`
@@ -51,12 +53,21 @@ func NewMovieModel(db *sqlx.DB) MovieModel {
 }
 
 func (m *MovieModel) Insert(movie *Movie) error {
-	query := `
-		INSERT INTO movies (title, year, runtime, genres)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at, version`
-
-	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
+	query, args, err := goqu.
+		Insert(m.tableName).
+		Rows(map[string]interface{}{
+			"title":      movie.Title,
+			"year":       movie.Year,
+			"runtime":    movie.Runtime,
+			"genres":     movie.Genres,
+			"created_at": time.Now(),
+			"updated_at": time.Now(),
+		}).
+		Returning("id", "created_at", "version").
+		ToSQL()
+	if err != nil {
+		return err
+	}
 
 	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
@@ -69,7 +80,7 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 	query, args, err := goqu.
 		Select("*").
 		From(m.tableName).
-		Where(goqu.Ex{"id": id}).
+		Where(goqu.Ex{"id": id, "deleted_at": nil}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -93,15 +104,17 @@ func (m *MovieModel) Update(movie *Movie) error {
 	query, args, err := goqu.
 		Update(m.tableName).
 		Set(map[string]interface{}{
-			"title":   movie.Title,
-			"year":    movie.Year,
-			"runtime": movie.Runtime,
-			"genres":  movie.Genres,
-			"version": movie.Version + 1,
+			"title":      movie.Title,
+			"year":       movie.Year,
+			"runtime":    movie.Runtime,
+			"genres":     movie.Genres,
+			"version":    movie.Version + 1,
+			"updated_at": time.Now(),
 		}).
 		Where(goqu.Ex{
-			"id":      movie.ID,
-			"version": movie.Version,
+			"id":         movie.ID,
+			"version":    movie.Version,
+			"deleted_at": nil,
 		}).
 		Returning("version").
 		ToSQL()
@@ -128,7 +141,10 @@ func (m *MovieModel) Delete(id int64) error {
 	}
 
 	query, args, err := goqu.
-		Delete(m.tableName).
+		Update(m.tableName).
+		Set(
+			goqu.Record{"deleted_at": time.Now()},
+		).
 		Where(goqu.Ex{
 			"id": id,
 		}).
