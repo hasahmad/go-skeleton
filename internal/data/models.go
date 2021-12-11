@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 )
 
 var (
@@ -13,12 +12,12 @@ var (
 )
 
 type TimeStampsModel struct {
-	CreatedAt pq.NullTime `json:"created_at" db:"created_at"`
-	UpdatedAt pq.NullTime `json:"updated_at" db:"updated_at"`
+	CreatedAt NullTime `json:"created_at" db:"created_at"`
+	UpdatedAt NullTime `json:"updated_at" db:"updated_at"`
 }
 
 type SoftDeletableTimeStampModel struct {
-	RemovedAt pq.NullTime `json:"deleted_at" db:"deleted_at"`
+	RemovedAt NullTime `json:"-" db:"deleted_at"`
 }
 
 type Models struct {
