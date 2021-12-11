@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/hasahmad/greenlight/internal/data"
+
 	// Import the pq driver so that it can register itself with the database/sql
 	// package.
 	_ "github.com/lib/pq"
@@ -31,6 +33,7 @@ type config struct {
 type application struct {
 	config config
 	logger *log.Logger
+	models data.Models
 }
 
 func main() {
@@ -60,6 +63,7 @@ func main() {
 	app := &application{
 		config: cfg,
 		logger: logger,
+		models: data.NewModels(db),
 	}
 
 	srv := &http.Server{

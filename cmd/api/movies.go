@@ -38,6 +38,8 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	app.models.Movies.Insert(movie)
+
 	fmt.Fprintf(w, "%+v\n", input)
 }
 
