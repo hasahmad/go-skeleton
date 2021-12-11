@@ -177,7 +177,7 @@ func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, 
 	where = append(where, goqu.Ex{"deleted_at": nil})
 
 	if len(title) > 0 && title != "" {
-		where = append(where, goqu.L("LOWER(title) = ?", strings.ToLower(title)))
+		where = append(where, goqu.L("to_tsvector('simple', title) @@ plainto_tsquery('simple', ?)", strings.ToLower(title)))
 	}
 
 	if len(genres) > 0 {
