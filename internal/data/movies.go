@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -16,7 +17,7 @@ type Movie struct {
 	TimeStampsModel
 	SoftDeletableTimeStampModel
 	ID        int64          `json:"id" db:"id"`
-	CreatedAt pq.NullTime    `json:"created_at" db:"created_at"`
+	CreatedAt NullTime       `json:"created_at" db:"created_at"`
 	Title     string         `json:"title" db:"title"`
 	Year      int32          `json:"year,omitempty" db:"year"`
 	Runtime   Runtime        `json:"runtime,omitempty" db:"runtime"`
@@ -169,4 +170,47 @@ func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, filters Filters) ([]*Movie, error) {
+	where := []goqu.Expression{}
+	where = append(where, goqu.Ex{"deleted_at": nil})
+
+	if len(title) > 0 && title != "" {
+		where = append(where, goqu.L("LOWER(title) = ?", strings.ToLower(title)))
+	}
+
+	if len(genres) > 0 {
+		genresVal := "{"
+		for i, g := range genres {
+			genresVal += "\"" + g + "\""
+			if i < len(genres)-1 {
+				genresVal += ","
+			}
+		}
+		genresVal += "}"
+		where = append(where, goqu.L("genres @> ?", genresVal))
+	}
+
+	query, args, err := goqu.
+		Select("*").
+		From(m.tableName).
+		Where(where...).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	movies := []*Movie{}
+	err = m.DB.SelectContext(ctx, &movies, query, args...)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return movies, nil
 }
