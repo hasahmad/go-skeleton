@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"sync"
 
 	"golang.org/x/time/rate"
 )
@@ -21,11 +23,9 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 				// sent.
 				w.Header().Set("Connection", "close")
 
-				// The value returned by recover() has the type interface{}, so we use
-				// fmt.Errorf() to normalize it into an error and call our
-				// serverErrorResponse() helper. In turn, this will log the error using
-				// our custom Logger type at the ERROR level and send the client a 500
-				// Internal Server Error response.
+				// The value returned by recover() has the type interface{}, so use
+				// fmt.Errorf() to normalize it into an error and call
+				// serverErrorResponse() helper.
 				app.serverErrorResponse(w, r, fmt.Errorf("%s", err))
 			}
 		}()
@@ -35,18 +35,40 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 }
 
 func (app *application) rateLimit(next http.Handler) http.Handler {
-	// Initialize a new rate limiter which allows an average of 2 requests per second,
-	// with a maximum of 4 requests in a single ‘burst’.
-	limiter := rate.NewLimiter(2, 4)
+	var (
+		mu      sync.Mutex
+		clients = make(map[string]*rate.Limiter)
+	)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Call limiter.Allow() to see if the request is permitted, and if it's not,
-		// then we call the rateLimitExceededResponse() helper to return a 429 Too Many
-		// Requests response (we will create this helper in a minute).
-		if !limiter.Allow() {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		// Lock the mutex to prevent this code from being executed concurrently.
+		mu.Lock()
+
+		// Check to see if the IP address already exists in the map. If it doesn't, then
+		// initialize a new rate limiter and add the IP address and limiter to the map.
+		if _, found := clients[ip]; !found {
+			clients[ip] = rate.NewLimiter(2, 4)
+		}
+
+		// If the request isn't allowed, unlock the mutex and
+		// send a 429 Too Many Requests response, just like before.
+		if !clients[ip].Allow() {
+			mu.Unlock()
 			app.rateLimitExceededResponse(w, r)
 			return
 		}
+
+		// Very importantly, unlock the mutex before calling the next handler in the
+		// chain. Notice that NOT using defer to unlock the mutex, as that would mean
+		// that the mutex isn't unlocked until all the handlers downstream of this
+		// middleware have also returned.
+		mu.Unlock()
 
 		next.ServeHTTP(w, r)
 	})
