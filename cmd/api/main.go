@@ -4,13 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/hasahmad/greenlight/internal/data"
 	"github.com/jmoiron/sqlx"
+
+	log "github.com/sirupsen/logrus"
 
 	// Import the pq driver so that it can register itself with the database/sql
 	// package.
@@ -49,7 +50,8 @@ func main() {
 
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	logger := log.New()
+	logger.SetFormatter(&log.JSONFormatter{})
 
 	db, err := openDB(cfg)
 	if err != nil {
@@ -58,7 +60,7 @@ func main() {
 
 	defer db.Close()
 
-	logger.Printf("database connection pool established")
+	logger.Info("database connection pool established")
 
 	app := &application{
 		config: cfg,
@@ -74,7 +76,10 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
+	logger.WithFields(log.Fields{
+		"addr": srv.Addr,
+		"env":  cfg.env,
+	}).Info("starting server")
 	err = srv.ListenAndServe()
 	logger.Fatal(err)
 }
