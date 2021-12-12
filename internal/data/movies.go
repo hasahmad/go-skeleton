@@ -172,8 +172,11 @@ func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, filters Filters) ([]*Movie, error) {
-	sel := goqu.Select("*").
+func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	sel := goqu.Select(
+		goqu.COUNT("*").Over(goqu.W()),
+		"id", "created_at", "title", "year", "runtime", "genres", "version",
+	).
 		From(m.tableName).
 		Where(goqu.Ex{"deleted_at": nil})
 
@@ -201,21 +204,55 @@ func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, 
 		}
 	}
 
-	query, args, err := sel.ToSQL()
-	if err != nil {
-		return nil, err
+	if filters.limit() > 0 && filters.Page > 0 {
+		sel = sel.Limit(uint(filters.limit())).
+			Offset(uint(filters.offset()))
 	}
 
-	movies := []*Movie{}
-	err = m.DB.SelectContext(ctx, &movies, query, args...)
+	query, args, err := sel.ToSQL()
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+
+	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return nil, ErrRecordNotFound
+			return nil, Metadata{}, ErrRecordNotFound
 		default:
-			return nil, err
+			return nil, Metadata{}, err
 		}
 	}
 
-	return movies, nil
+	defer rows.Close()
+
+	// Declare a totalRecords variable.
+	totalRecords := 0
+	movies := []*Movie{}
+
+	for rows.Next() {
+		var movie Movie
+
+		err := rows.Scan(
+			&totalRecords, // Scan the count from the window function into totalRecords.
+			&movie.ID,
+			&movie.CreatedAt,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			&movie.Genres,
+			&movie.Version,
+		)
+		if err != nil {
+			return nil, Metadata{}, err // Update this to return an empty Metadata struct.
+		}
+
+		movies = append(movies, &movie)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, Metadata{}, err // Update this to return an empty Metadata struct.
+	}
+
+	return movies, calculateMetadata(totalRecords, filters.Page, filters.PageSize), nil
 }
