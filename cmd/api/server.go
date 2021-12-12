@@ -40,17 +40,24 @@ func (app *application) serve() error {
 
 		app.logger.WithFields(log.Fields{
 			"signal": s.String(),
-		}).Info("shutting down server")
+		}).Info("caught signal")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		// Call Shutdown() on our server, passing in the context we just made.
+		// Call Shutdown() on our server with context we just made.
 		// Shutdown() will return nil if the graceful shutdown was successful, or an
 		// error (which may happen because of a problem closing the listeners, or
 		// because the shutdown didn't complete before the 5-second context deadline is
-		// hit). We relay this return value to the shutdownError channel.
-		shutdownError <- srv.Shutdown(ctx)
+		// hit). We relay this return value to the shutdownError channel if has error
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			shutdownError <- err
+		}
+
+		app.logger.WithFields(log.Fields{"addr": srv.Addr}).Info("completing background tasks")
+		app.wg.Wait()
+		shutdownError <- nil
 	}()
 
 	app.logger.WithFields(log.Fields{
