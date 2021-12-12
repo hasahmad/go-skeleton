@@ -195,7 +195,6 @@ func (m UserModel) GetForToken(ctx context.Context, tokenScope, tokenPlaintext s
 		return nil, err
 	}
 
-	println(query)
 	var user User
 	err = m.DB.GetContext(ctx, &user, query, args...)
 	if err != nil {
