@@ -173,11 +173,12 @@ func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 }
 
 func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, filters Filters) ([]*Movie, error) {
-	where := []goqu.Expression{}
-	where = append(where, goqu.Ex{"deleted_at": nil})
+	sel := goqu.Select("*").
+		From(m.tableName).
+		Where(goqu.Ex{"deleted_at": nil})
 
 	if len(title) > 0 && title != "" {
-		where = append(where, goqu.L("to_tsvector('simple', title) @@ plainto_tsquery('simple', ?)", strings.ToLower(title)))
+		sel = sel.Where(goqu.L("to_tsvector('simple', title) @@ plainto_tsquery('simple', ?)", strings.ToLower(title)))
 	}
 
 	if len(genres) > 0 {
@@ -189,14 +190,18 @@ func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, 
 			}
 		}
 		genresVal += "}"
-		where = append(where, goqu.L("genres @> ?", genresVal))
+		sel = sel.Where(goqu.L("genres @> ?", genresVal))
 	}
 
-	query, args, err := goqu.
-		Select("*").
-		From(m.tableName).
-		Where(where...).
-		ToSQL()
+	if filters.Sort != "" {
+		if filters.sortDirection() == "DESC" {
+			sel = sel.Order(goqu.I(filters.sortColumn()).Desc())
+		} else {
+			sel = sel.Order(goqu.I(filters.sortColumn()).Asc())
+		}
+	}
+
+	query, args, err := sel.ToSQL()
 	if err != nil {
 		return nil, err
 	}
