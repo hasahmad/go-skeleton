@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	ScopeAtivation = "activation"
+	ScopeActivation = "activation"
 )
 
 type Token struct {
@@ -92,7 +92,7 @@ func (m TokenModel) Insert(ctx context.Context, token *Token) error {
 	return err
 }
 
-func (m TokenModel) DeleteAllForUser(ctx context.Context, userID int64, scope string) error {
+func (m TokenModel) DeleteAllForUser(ctx context.Context, scope string, userID int64) error {
 	query, args, err := goqu.
 		Delete(m.tableName).
 		Where(goqu.Ex{

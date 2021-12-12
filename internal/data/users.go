@@ -2,7 +2,9 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"time"
 
@@ -30,6 +32,23 @@ type User struct {
 type password struct {
 	plaintext *string
 	hash      []byte
+}
+
+func (p *password) Scan(value interface{}) error {
+	if value == nil {
+		p.plaintext, p.hash = nil, nil
+		return nil
+	}
+	p.plaintext = nil
+	p.hash = value.([]byte)
+	return nil
+}
+
+func (p password) Value() (driver.Value, error) {
+	if p.hash == nil {
+		return nil, nil
+	}
+	return p.hash, nil
 }
 
 func (p *password) Set(plaintextPassword string) error {
@@ -137,6 +156,40 @@ func (m UserModel) GetByEmail(ctx context.Context, email string) (*User, error) 
 		return nil, err
 	}
 
+	var user User
+	err = m.DB.GetContext(ctx, &user, query, args...)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
+}
+
+func (m UserModel) GetForToken(ctx context.Context, tokenScope, tokenPlaintext string) (*User, error) {
+	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
+
+	query, args, err := goqu.
+		Select(goqu.I("u.*")).
+		From(goqu.T(m.tableName).As("u")).
+		Join(goqu.T("tokens").As("t"), goqu.On(
+			goqu.I("t.user_id").Eq(goqu.I("u.id")))).
+		Where(goqu.Ex{
+			"t.hash":       tokenHash[:],
+			"t.scope":      tokenScope,
+			"u.deleted_at": nil,
+		}).
+		Where(goqu.I("t.expiry").Gt(time.Now())).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	println(query)
 	var user User
 	err = m.DB.GetContext(ctx, &user, query, args...)
 	if err != nil {
