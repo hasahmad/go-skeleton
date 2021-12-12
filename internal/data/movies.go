@@ -185,15 +185,7 @@ func (m MovieModel) GetAll(ctx context.Context, title string, genres []string, f
 	}
 
 	if len(genres) > 0 {
-		genresVal := "{"
-		for i, g := range genres {
-			genresVal += "\"" + g + "\""
-			if i < len(genres)-1 {
-				genresVal += ","
-			}
-		}
-		genresVal += "}"
-		sel = sel.Where(goqu.L("genres @> ?", genresVal))
+		sel = sel.Where(goqu.L("genres @> ?", pq.Array(genres)))
 	}
 
 	if filters.Sort != "" {
