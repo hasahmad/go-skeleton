@@ -18,6 +18,8 @@ var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
 
+var AnonymousUser = &User{}
+
 type User struct {
 	TimeStampsModel
 	SoftDeletableTimeStampModel
@@ -27,6 +29,10 @@ type User struct {
 	Password  password `json:"-" db:"password_hash"`
 	Activated bool     `json:"activated" db:"activated"`
 	Version   int      `json:"-" db:"version"`
+}
+
+func (u *User) IsAnonymousUser() bool {
+	return u == AnonymousUser
 }
 
 type password struct {
