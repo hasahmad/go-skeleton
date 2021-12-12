@@ -23,11 +23,13 @@ type SoftDeletableTimeStampModel struct {
 type Models struct {
 	Movies MovieModel
 	Users  UserModel
+	Tokens TokenModel
 }
 
 func NewModels(db *sqlx.DB) Models {
 	return Models{
 		Movies: NewMovieModel(db),
 		Users:  NewUserModel(db),
+		Tokens: NewTokenModel(db),
 	}
 }

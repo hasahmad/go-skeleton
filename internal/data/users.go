@@ -151,7 +151,7 @@ func (m UserModel) GetByEmail(ctx context.Context, email string) (*User, error) 
 	return &user, nil
 }
 
-func (m *UserModel) Update(ctx context.Context, user *User) error {
+func (m UserModel) Update(ctx context.Context, user *User) error {
 	data := map[string]interface{}{
 		"activated":  user.Activated,
 		"version":    user.Version + 1,
@@ -196,7 +196,7 @@ func (m *UserModel) Update(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (m *UserModel) Delete(ctx context.Context, id int64) error {
+func (m UserModel) Delete(ctx context.Context, id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}

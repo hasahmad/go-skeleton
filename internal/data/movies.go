@@ -54,7 +54,7 @@ func NewMovieModel(db *sqlx.DB) MovieModel {
 	}
 }
 
-func (m *MovieModel) Insert(ctx context.Context, movie *Movie) error {
+func (m MovieModel) Insert(ctx context.Context, movie *Movie) error {
 	query, args, err := goqu.
 		Insert(m.tableName).
 		Rows(map[string]interface{}{
@@ -74,7 +74,7 @@ func (m *MovieModel) Insert(ctx context.Context, movie *Movie) error {
 	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
-func (m *MovieModel) Get(ctx context.Context, id int64) (*Movie, error) {
+func (m MovieModel) Get(ctx context.Context, id int64) (*Movie, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}
@@ -102,7 +102,7 @@ func (m *MovieModel) Get(ctx context.Context, id int64) (*Movie, error) {
 	return &movie, nil
 }
 
-func (m *MovieModel) Update(ctx context.Context, movie *Movie) error {
+func (m MovieModel) Update(ctx context.Context, movie *Movie) error {
 	query, args, err := goqu.
 		Update(m.tableName).
 		Set(map[string]interface{}{
@@ -137,7 +137,7 @@ func (m *MovieModel) Update(ctx context.Context, movie *Movie) error {
 	return nil
 }
 
-func (m *MovieModel) Delete(ctx context.Context, id int64) error {
+func (m MovieModel) Delete(ctx context.Context, id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}
@@ -172,7 +172,7 @@ func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (m *MovieModel) GetAll(ctx context.Context, title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+func (m MovieModel) GetAll(ctx context.Context, title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
 	sel := goqu.Select(
 		goqu.COUNT("*").Over(goqu.W()),
 		"id", "created_at", "title", "year", "runtime", "genres", "version",
