@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"net/http"
 	"os"
 	"time"
 
@@ -79,20 +77,10 @@ func main() {
 		models: data.NewModels(db),
 	}
 
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	err = app.serve()
+	if err != nil {
+		logger.Fatal(err)
 	}
-
-	logger.WithFields(log.Fields{
-		"addr": srv.Addr,
-		"env":  cfg.env,
-	}).Info("starting server")
-	err = srv.ListenAndServe()
-	logger.Fatal(err)
 }
 
 func openDB(cfg config) (*sqlx.DB, error) {
