@@ -24,4 +24,5 @@ vendor/
 .env
 .envrc
 
+# Uploads directory
 uploads/
