@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hasahmad/go-skeleton/internal/validator"
 	"github.com/julienschmidt/httprouter"
 )
@@ -25,6 +26,44 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 	}
 
 	return id, nil
+}
+
+func (app *application) readUUIDParam(r *http.Request) (uuid.UUID, error) {
+	params := httprouter.ParamsFromContext(r.Context())
+
+	var id uuid.UUID
+
+	if params.ByName("id") == "" {
+		return id, errors.New("invalid id parameter")
+	}
+
+	err := id.Scan(params.ByName("id"))
+	if err != nil || id.String() == "" {
+		return id, errors.New("invalid id parameter")
+	}
+
+	return id, nil
+}
+
+func (app *application) readUUIDParamByKey(r *http.Request, key string) (uuid.UUID, error) {
+	params := httprouter.ParamsFromContext(r.Context())
+
+	var uid uuid.UUID
+
+	if key == "" {
+		key = "id"
+	}
+
+	if params.ByName(key) == "" {
+		return uid, errors.New("invalid id parameter")
+	}
+
+	err := uid.Scan(params.ByName(key))
+	if err != nil || uid.String() == "" {
+		return uid, errors.New("invalid id parameter")
+	}
+
+	return uid, nil
 }
 
 func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
@@ -94,47 +133,82 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 
 // The readString() helper returns a string value from the query string, or the provided
 // default value if no matching key could be found.
-func (app *application) readString(qs url.Values, key string, defaultValue string) string {
+func (app *application) readString(qs url.Values, key string, defaultValue string) (string, bool) {
+	exists := qs.Has(key)
 	s := qs.Get(key)
 
 	if s == "" {
-		return defaultValue
+		return defaultValue, exists
 	}
 
-	return s
+	return s, exists
+}
+
+// readBool Read Boolean value from string and retutns the value and
+// if the value exists in the querystring (!= "")
+func (app *application) readBool(qs url.Values, key string, defaultValue bool) (bool, bool) {
+	s := qs.Get(key)
+
+	if s == "" {
+		return defaultValue, false
+	}
+
+	if s == "true" || s == "t" || s == "y" || s == "1" {
+		return true, true
+	} else if s == "false" || s == "f" || s == "n" || s == "0" {
+		return false, true
+	}
+
+	return defaultValue, true
 }
 
 // The readCSV() helper reads a string value from the query string and then splits it
 // into a slice on the comma character. If no matching key could be found, it returns
 // the provided default value.
-func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+func (app *application) readCSV(qs url.Values, key string, defaultValue []string) ([]string, bool) {
 	csv := qs.Get(key)
 
 	if csv == "" {
-		return defaultValue
+		return defaultValue, false
 	}
 
-	return strings.Split(csv, ",")
+	return strings.Split(csv, ","), true
 }
 
 // The readInt() helper reads a string value from the query string and converts it to an
 // integer before returning. If no matching key could be found it returns the provided
 // default value. If the value couldn't be converted to an integer, then we record an
 // error message in the provided Validator instance.
-func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) (int, bool) {
 	s := qs.Get(key)
 
 	if s == "" {
-		return defaultValue
+		return defaultValue, false
 	}
 
 	i, err := strconv.Atoi(s)
 	if err != nil {
 		v.AddError(key, "must be an integer value")
-		return defaultValue
+		return defaultValue, true
 	}
 
-	return i
+	return i, true
+}
+
+func (app *application) readFloat(qs url.Values, key string, defaultValue float64, v *validator.Validator) (float64, bool) {
+	s := qs.Get(key)
+
+	if s == "" {
+		return defaultValue, false
+	}
+
+	val, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		v.AddError(key, "must be a float value")
+		return defaultValue, true
+	}
+
+	return val, true
 }
 
 // The background() helper accepts an arbitrary function as a parameter.
