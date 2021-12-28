@@ -1,5 +1,8 @@
 include .envrc
 
+SMTP_PORT ?= 25
+TRUSTED_ORIGINS ?= localhost 127.0.0.1
+
 # ==================================================================================== #
 # HELPERS
 # ==================================================================================== #
@@ -21,7 +24,7 @@ confirm:
 ## run/api: run the cmd/api application
 .PHONY: run/api
 run/api:
-	go run ./cmd/api -db-dsn=${DB_DSN}
+	go run ./cmd/api -db-dsn=${DB_DSN} -smtp-port=${SMTP_PORT} -cors-trusted-origins=${TRUSTED_ORIGINS}
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
@@ -32,13 +35,24 @@ db/psql:
 .PHONY: db/migrations/new
 db/migrations/new:
 	@echo 'Creating migration files for ${name}...'
-	migrate create -seq -ext=.sql -dir=./migrations ${name}
+	goose -dir=./migrations create ${name} go
 
 ## db/migrations/up: apply all up database migrations
 .PHONY: db/migrations/up
-db/migrations/up: confirm
+db/migrations/up: build/migrate confirm
 	@echo 'Running up migrations...'
-	migrate -path ./migrations -database ${DB_DSN} up
+	DB_DSN=${DB_DSN} ./bin/migrate -dir ./migrations up
+
+## db/migrations/down: revert last database migration
+.PHONY: db/migrations/down
+db/migrations/down: build/migrate confirm
+	@echo 'Reverting last migration...'
+	DB_DSN=${DB_DSN} ./bin/migrate -dir ./migrations down
+
+## db/migrations/status: show database migrations status
+.PHONY: db/migrations/status
+db/migrations/status: build/migrate
+	DB_DSN=${DB_DSN} ./bin/migrate -dir migrations status
 
 # ==================================================================================== #
 # QUALITY CONTROL
@@ -81,3 +95,9 @@ build/api:
 	@echo 'Building cmd/api...'
 	go build -ldflags=${linker_flags} -o=./bin/api ./cmd/api
 	GOOS=linux GOARCH=amd64 go build -ldflags=${linker_flags} -o=./bin/linux_amd64/api ./cmd/api
+
+## build/migrate: build the cmd/migrate application
+.PHONY: build/migrate
+build/migrate:
+	go build -o=./bin/migrate ./cmd/migrate
+	GOOS=linux GOARCH=amd64 go build -o=./bin/linux_amd64/migrate ./cmd/migrate
