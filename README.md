@@ -1,2 +1,2 @@
-# greenlight
+# go-skeleton
 

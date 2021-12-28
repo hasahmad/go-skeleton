@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/hasahmad/greenlight/internal/data"
+	"github.com/hasahmad/go-skeleton/internal/data"
 )
 
 type contextKey string

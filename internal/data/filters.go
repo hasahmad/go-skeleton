@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/hasahmad/greenlight/internal/validator"
+	"github.com/hasahmad/go-skeleton/internal/validator"
 )
 
 type Filters struct {

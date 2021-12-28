@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hasahmad/greenlight/internal/validator"
+	"github.com/hasahmad/go-skeleton/internal/validator"
 	"github.com/julienschmidt/httprouter"
 )
 

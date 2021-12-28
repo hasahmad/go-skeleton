@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
-	"github.com/hasahmad/greenlight/internal/validator"
+	"github.com/hasahmad/go-skeleton/internal/validator"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )

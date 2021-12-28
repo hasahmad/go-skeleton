@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hasahmad/greenlight/internal/data"
-	"github.com/hasahmad/greenlight/internal/validator"
+	"github.com/hasahmad/go-skeleton/internal/data"
+	"github.com/hasahmad/go-skeleton/internal/validator"
 )
 
 func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,4 @@
-module github.com/hasahmad/greenlight
+module github.com/hasahmad/go-skeleton
 
 go 1.17
 

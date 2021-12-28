@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hasahmad/greenlight/internal/data"
-	"github.com/hasahmad/greenlight/internal/mailer"
+	"github.com/hasahmad/go-skeleton/internal/data"
+	"github.com/hasahmad/go-skeleton/internal/mailer"
 	"github.com/jmoiron/sqlx"
 
 	log "github.com/sirupsen/logrus"
@@ -69,7 +69,7 @@ func main() {
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 
-	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgreSQL DSN")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("DB_DSN"), "PostgreSQL DSN")
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
@@ -82,7 +82,7 @@ func main() {
 	flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP Port")
 	flag.StringVar(&cfg.smtp.username, "smtp-user", "", "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-pass", "", "SMTP password")
-	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@hasahmad.github.io>", "SMTP sender")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "GO Skeleton <no-reply@hasahmad.github.io>", "SMTP sender")
 
 	cfg.cors.trustedOrigins = []string{}
 	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(s string) error {
