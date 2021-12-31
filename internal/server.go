@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (app *application) serve() error {
+func (app *Application) Serve() error {
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.config.port),
-		Handler:      app.routes(),
+		Addr:         fmt.Sprintf(":%d", app.cfg.Port),
+		Handler:      app.Routes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -62,7 +62,7 @@ func (app *application) serve() error {
 
 	app.logger.WithFields(log.Fields{
 		"addr": srv.Addr,
-		"env":  app.config.env,
+		"env":  app.cfg.Env,
 	}).Info("starting server")
 
 	// Calling Shutdown() on our server will cause ListenAndServe() to immediately
