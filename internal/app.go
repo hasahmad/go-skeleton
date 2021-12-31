@@ -25,7 +25,7 @@ type Application struct {
 	wg          sync.WaitGroup
 }
 
-func New(
+func NewApplication(
 	logger *logrus.Logger,
 	cfg config.Config,
 	db *sqlx.DB,

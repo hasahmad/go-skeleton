@@ -73,7 +73,7 @@ func main() {
 		return time.Now().Unix()
 	}))
 
-	app := internal.New(logger, cfg, db, sync.WaitGroup{})
+	app := internal.NewApplication(logger, cfg, db, sync.WaitGroup{})
 	err = app.Serve()
 	if err != nil {
 		logger.Fatal(err)
