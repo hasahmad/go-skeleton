@@ -14,6 +14,7 @@ require (
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce
 	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
+	gopkg.in/guregu/null.v4 v4.0.0
 )
 
 require (

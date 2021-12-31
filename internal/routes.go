@@ -15,16 +15,15 @@ func (app *Application) Routes() http.Handler {
 
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.controllers.HealthcheckHandler)
 
-	router.HandlerFunc(http.MethodGet, "/v1/movies", app.middlewares.RequirePermission("movies:read", app.controllers.ListMoviesHandler))
-	router.HandlerFunc(http.MethodPost, "/v1/movies", app.middlewares.RequirePermission("movies:write", app.controllers.CreateMovieHandler))
-	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.middlewares.RequirePermission("movies:read", app.controllers.ShowMovieHandler))
-	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.middlewares.RequirePermission("movies:write", app.controllers.UpdateMovieHandler))
-	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.middlewares.RequirePermission("movies:write", app.controllers.DeleteMovieHandler))
+	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.controllers.CreateAuthenticationTokenHandler)
 
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.controllers.RegisterUserHandler)
 	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.controllers.ActivateUserHandler)
 
-	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.controllers.CreateAuthenticationTokenHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/users", app.middlewares.RequirePermission("users:list", app.controllers.ListUsersHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/users/:id", app.middlewares.RequirePermission("users:show", app.controllers.ShowUserHandler))
+	router.HandlerFunc(http.MethodPatch, "/v1/users/:id", app.middlewares.RequirePermission("users:edit", app.controllers.UpdateUserHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/users/:id", app.middlewares.RequirePermission("users:delete", app.controllers.DeleteUserHandler))
 
 	router.Handler(http.MethodGet, "/debug/vars", expvar.Handler())
 

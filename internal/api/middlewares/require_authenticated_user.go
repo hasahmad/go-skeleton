@@ -23,7 +23,7 @@ func (m *Middlewares) RequireActivatedUser(next http.HandlerFunc) http.HandlerFu
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := apicontext.ContextGetUser(r)
 
-		if !user.Activated {
+		if !user.IsActive {
 			m.errors.InactiveAccountResponse(w, r)
 			return
 		}

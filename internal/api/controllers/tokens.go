@@ -54,7 +54,7 @@ func (ctrl Controllers) CreateAuthenticationTokenHandler(w http.ResponseWriter, 
 		return
 	}
 
-	token, err := ctrl.models.Tokens.New(r.Context(), user.ID, 24*time.Hour, data.ScopeAuthentication)
+	token, err := ctrl.models.Tokens.New(r.Context(), user.UserID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {
 		ctrl.errors.ServerErrorResponse(w, r, err)
 		return

@@ -6,12 +6,15 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/google/uuid"
 	"github.com/hasahmad/go-skeleton/internal/validator"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/guregu/null.v4"
 )
 
 var (
@@ -23,12 +26,17 @@ var AnonymousUser = &User{}
 type User struct {
 	TimeStampsModel
 	SoftDeletableTimeStampModel
-	ID        int64    `json:"id" db:"id"`
-	Name      string   `json:"name" db:"name"`
-	Email     string   `json:"email" db:"email"`
-	Password  password `json:"-" db:"password_hash"`
-	Activated bool     `json:"activated" db:"activated"`
-	Version   int      `json:"-" db:"version"`
+	UserID      uuid.UUID   `json:"user_id" db:"user_id"`
+	FirstName   string      `json:"first_name" db:"first_name"`
+	LastName    null.String `json:"last_name" db:"last_name"`
+	Username    null.String `json:"username" db:"username"`
+	Email       string      `json:"email" db:"email"`
+	Password    password    `json:"-" db:"password"`
+	IsActive    bool        `json:"is_active" db:"is_active"`
+	IsStaff     bool        `json:"is_staff" db:"is_staff"`
+	IsSuperuser bool        `json:"is_superuser" db:"is_superuser"`
+	LastLogin   null.Time   `json:"last_login" db:"last_login"`
+	Version     int         `json:"-" db:"version"`
 }
 
 func (u *User) IsAnonymousUser() bool {
@@ -46,7 +54,19 @@ func (p *password) Scan(value interface{}) error {
 		return nil
 	}
 	p.plaintext = nil
-	p.hash = value.([]byte)
+	v, ok := value.([]byte)
+	if !ok {
+		// most likely a string
+		vstr, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unable to convert password hash")
+		} else {
+			p.hash = []byte(vstr)
+		}
+	} else {
+		p.hash = v
+	}
+
 	return nil
 }
 
@@ -95,8 +115,8 @@ func ValidatePasswordPlaintext(v *validator.Validator, password string) {
 }
 
 func ValidateUser(v *validator.Validator, user *User) {
-	v.Check(user.Name != "", "name", "must be provided")
-	v.Check(len(user.Name) <= 500, "name", "must not be more than 500 bytes long")
+	v.Check(user.FirstName != "", "first_name", "must be provided")
+	v.Check(len(user.FirstName) <= 500, "first_name", "must not be more than 500 bytes long")
 
 	ValidateEmail(v, user.Email)
 
@@ -125,21 +145,26 @@ func (m UserModel) Insert(ctx context.Context, user *User) error {
 	query, args, err := goqu.
 		Insert(m.tableName).
 		Rows(map[string]interface{}{
-			"created_at":    time.Now(),
-			"updated_at":    time.Now(),
-			"name":          user.Name,
-			"email":         user.Email,
-			"password_hash": user.Password.hash,
-			"activated":     user.Activated,
+			"created_at":   time.Now(),
+			"updated_at":   time.Now(),
+			"first_name":   user.FirstName,
+			"last_name":    user.LastName,
+			"email":        user.Email,
+			"password":     user.Password.hash,
+			"is_active":    user.IsActive,
+			"is_staff":     user.IsStaff,
+			"is_superuser": user.IsSuperuser,
+			"username":     user.Username,
+			"last_login":   user.LastLogin,
 		}).
-		Returning("id", "created_at", "version").
+		Returning("user_id", "created_at", "updated_at", "version").
 		ToSQL()
 
 	if err != nil {
 		return err
 	}
 
-	err = m.DB.QueryRowContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
+	err = m.DB.QueryRowContext(ctx, query, args...).Scan(&user.UserID, &user.CreatedAt, &user.UpdatedAt, &user.Version)
 	if err != nil {
 		switch {
 		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
@@ -150,6 +175,30 @@ func (m UserModel) Insert(ctx context.Context, user *User) error {
 	}
 
 	return nil
+}
+
+func (m UserModel) Get(ctx context.Context, id uuid.UUID) (*User, error) {
+	query, args, err := goqu.
+		Select("*").
+		From(m.tableName).
+		Where(goqu.Ex{"user_id": id, "deleted_at": nil}).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	var user User
+	err = m.DB.GetContext(ctx, &user, query, args...)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }
 
 func (m UserModel) GetByEmail(ctx context.Context, email string) (*User, error) {
@@ -183,7 +232,7 @@ func (m UserModel) GetForToken(ctx context.Context, tokenScope, tokenPlaintext s
 		Select(goqu.I("u.*")).
 		From(goqu.T(m.tableName).As("u")).
 		Join(goqu.T("tokens").As("t"), goqu.On(
-			goqu.I("t.user_id").Eq(goqu.I("u.id")))).
+			goqu.I("t.user_id").Eq(goqu.I("u.user_id")))).
 		Where(goqu.Ex{
 			"t.hash":       tokenHash[:],
 			"t.scope":      tokenScope,
@@ -211,25 +260,34 @@ func (m UserModel) GetForToken(ctx context.Context, tokenScope, tokenPlaintext s
 
 func (m UserModel) Update(ctx context.Context, user *User) error {
 	data := map[string]interface{}{
-		"activated":  user.Activated,
+		"is_active":  user.IsActive,
 		"version":    user.Version + 1,
 		"updated_at": time.Now(),
 	}
 	if user.Password.hash != nil {
-		data["password_hash"] = user.Password.hash
+		data["password"] = user.Password.hash
 	}
 	if user.Email != "" {
 		data["email"] = user.Email
 	}
-	if user.Name != "" {
-		data["name"] = user.Name
+	if user.FirstName != "" {
+		data["first_name"] = user.FirstName
+	}
+	if user.LastName.Valid {
+		data["last_name"] = user.LastName
+	}
+	if user.Username.Valid {
+		data["username"] = user.Username
+	}
+	if user.IsSuperuser {
+		data["is_superuser"] = user.IsSuperuser
 	}
 
 	query, args, err := goqu.
 		Update(m.tableName).
 		Set(data).
 		Where(goqu.Ex{
-			"id":         user.ID,
+			"user_id":    user.UserID,
 			"version":    user.Version,
 			"deleted_at": nil,
 		}).
@@ -254,18 +312,14 @@ func (m UserModel) Update(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (m UserModel) Delete(ctx context.Context, id int64) error {
-	if id < 1 {
-		return ErrRecordNotFound
-	}
-
+func (m UserModel) Delete(ctx context.Context, id uuid.UUID) error {
 	query, args, err := goqu.
 		Update(m.tableName).
 		Set(
 			goqu.Record{"deleted_at": time.Now()},
 		).
 		Where(goqu.Ex{
-			"id": id,
+			"user_id": id,
 		}).
 		ToSQL()
 	if err != nil {
@@ -287,4 +341,84 @@ func (m UserModel) Delete(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+func (m UserModel) GetAll(ctx context.Context, wheres []goqu.Expression, filters Filters) ([]*User, Metadata, error) {
+	sel := goqu.Select(
+		goqu.COUNT("*").Over(goqu.W()),
+		"user_id", "created_at", "updated_at",
+		"email", "username",
+		"first_name", "last_name",
+		"is_active", "is_staff", "is_superuser", "version",
+	).
+		From(m.tableName).
+		Where(goqu.Ex{"deleted_at": nil})
+
+	for i := range wheres {
+		sel.Where(wheres[i])
+	}
+
+	if filters.Sort != "" {
+		if filters.sortDirection() == "DESC" {
+			sel = sel.Order(goqu.I(filters.sortColumn()).Desc())
+		} else {
+			sel = sel.Order(goqu.I(filters.sortColumn()).Asc())
+		}
+	}
+
+	if filters.limit() > 0 && filters.Page > 0 {
+		sel = sel.Limit(uint(filters.limit())).
+			Offset(uint(filters.offset()))
+	}
+
+	query, args, err := sel.ToSQL()
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+
+	rows, err := m.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, Metadata{}, ErrRecordNotFound
+		default:
+			return nil, Metadata{}, err
+		}
+	}
+
+	defer rows.Close()
+
+	// Declare a totalRecords variable.
+	totalRecords := 0
+	users := []*User{}
+
+	for rows.Next() {
+		var user User
+
+		err := rows.Scan(
+			&totalRecords, // Scan the count from the window function into totalRecords.
+			&user.UserID,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+			&user.Email,
+			&user.Username,
+			&user.FirstName,
+			&user.LastName,
+			&user.IsActive,
+			&user.IsStaff,
+			&user.IsSuperuser,
+			&user.Version,
+		)
+		if err != nil {
+			return nil, Metadata{}, err // Update this to return an empty Metadata struct.
+		}
+
+		users = append(users, &user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, Metadata{}, err // Update this to return an empty Metadata struct.
+	}
+
+	return users, calculateMetadata(totalRecords, filters.Page, filters.PageSize), nil
 }

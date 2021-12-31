@@ -10,7 +10,7 @@ func (m *Middlewares) RequirePermission(code string, next http.HandlerFunc) http
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := apicontext.ContextGetUser(r)
 
-		permissions, err := m.models.Permissions.GetAllForUser(r.Context(), user.ID)
+		permissions, err := m.models.Permissions.GetAllForUser(r.Context(), user.UserID)
 		if err != nil {
 			m.errors.ServerErrorResponse(w, r, err)
 			return
