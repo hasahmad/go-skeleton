@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"expvar"
 	"flag"
 	"fmt"
@@ -11,7 +12,7 @@ import (
 
 	"github.com/hasahmad/go-skeleton/internal"
 	"github.com/hasahmad/go-skeleton/internal/config"
-	"github.com/hasahmad/go-skeleton/internal/db"
+	"github.com/jmoiron/sqlx"
 
 	log "github.com/sirupsen/logrus"
 
@@ -28,7 +29,7 @@ var (
 func main() {
 	cfg, err := config.InitByFlag()
 	if err != nil {
-		fmt.Errorf(err.Error())
+		fmt.Errorf("sdf %s", err.Error())
 		os.Exit(0)
 	}
 
@@ -47,7 +48,7 @@ func main() {
 	logger := log.New()
 	logger.SetFormatter(&log.JSONFormatter{})
 
-	db, err := db.OpenDB(cfg)
+	db, err := OpenDB(cfg)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -78,4 +79,36 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+}
+
+func OpenDB(cfg config.Config) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", cfg.DB.DSN)
+	if err != nil {
+		return nil, err
+	}
+
+	db.SetMaxOpenConns(cfg.DB.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.DB.MaxIdleConns)
+
+	duration, err := time.ParseDuration(cfg.DB.MaxIdleTime)
+	if err != nil {
+		return nil, err
+	}
+
+	db.SetConnMaxIdleTime(duration)
+
+	// Create a context with a 5-second timeout deadline.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Use PingContext() to establish a new connection to the database, passing in the
+	// context we created above as a parameter. If the connection couldn't be
+	// established successfully within the 5 second deadline, then this will return an
+	// error.
+	err = db.PingContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }

@@ -1,0 +1,4 @@
+export DB_DSN=postgres://db_user:db_pass@localhost:5432/db_name?sslmode=disable
+export SMTP_PORT=25
+export TRUSTED_ORIGINS='http://127.0.0.1'
+
