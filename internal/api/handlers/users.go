@@ -62,7 +62,8 @@ func (h Handlers) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.models.Permissions.AddForUser(r.Context(), user.UserID, "movies:read")
+	// add initial user role once registered
+	err = h.models.Roles.AddForUser(r.Context(), user.UserID, "user")
 	if err != nil {
 		h.errors.ServerErrorResponse(w, r, err)
 		return
