@@ -6,7 +6,7 @@ import (
 	apicontext "github.com/hasahmad/go-skeleton/internal/api/context"
 )
 
-func (m *Middlewares) RequireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+func (m Middlewares) RequireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := apicontext.ContextGetUser(r)
 
@@ -19,7 +19,7 @@ func (m *Middlewares) RequireAuthenticatedUser(next http.HandlerFunc) http.Handl
 	})
 }
 
-func (m *Middlewares) RequireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+func (m Middlewares) RequireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := apicontext.ContextGetUser(r)
 

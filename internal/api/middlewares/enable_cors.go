@@ -2,7 +2,7 @@ package middlewares
 
 import "net/http"
 
-func (m *Middlewares) EnableCORS(next http.Handler) http.Handler {
+func (m Middlewares) EnableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Origin")
 

@@ -10,7 +10,7 @@ import (
 	"github.com/hasahmad/go-skeleton/internal/validator"
 )
 
-func (m *Middlewares) Authenticate(next http.Handler) http.Handler {
+func (m Middlewares) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Add the "Vary: Authorization" header to the response. This indicates to any
 		// caches that the response may vary based on the value of the Authorization

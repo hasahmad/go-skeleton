@@ -9,7 +9,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func (m *Middlewares) RateLimit(next http.Handler) http.Handler {
+func (m Middlewares) RateLimit(next http.Handler) http.Handler {
 	type client struct {
 		limiter  *rate.Limiter
 		lastSeen time.Time

@@ -6,7 +6,7 @@ import (
 	apicontext "github.com/hasahmad/go-skeleton/internal/api/context"
 )
 
-func (m *Middlewares) RequirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+func (m Middlewares) RequirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := apicontext.ContextGetUser(r)
 
