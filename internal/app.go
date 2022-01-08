@@ -3,8 +3,8 @@ package internal
 import (
 	"sync"
 
-	"github.com/hasahmad/go-skeleton/internal/api/controllers"
 	apierrors "github.com/hasahmad/go-skeleton/internal/api/errors"
+	"github.com/hasahmad/go-skeleton/internal/api/handlers"
 	"github.com/hasahmad/go-skeleton/internal/api/middlewares"
 	"github.com/hasahmad/go-skeleton/internal/config"
 	"github.com/hasahmad/go-skeleton/internal/data"
@@ -20,7 +20,7 @@ type Application struct {
 	errors      apierrors.ErrorResponses
 	mailer      mailer.Mailer
 	models      data.Models
-	controllers controllers.Controllers
+	handlers    handlers.Handlers
 	middlewares middlewares.Middlewares
 	wg          sync.WaitGroup
 }
@@ -42,6 +42,6 @@ func NewApplication(
 		mailer:      mailer,
 		models:      models,
 		middlewares: middlewares.New(logger, cfg, errorReps, models),
-		controllers: controllers.New(logger, cfg, errorReps, models, mailer, wg),
+		handlers:    handlers.New(logger, cfg, errorReps, models, mailer, wg),
 	}
 }

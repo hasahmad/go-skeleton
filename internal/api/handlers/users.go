@@ -1,4 +1,4 @@
-package controllers
+package handlers
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 	"gopkg.in/guregu/null.v4"
 )
 
-func (ctrl Controllers) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
@@ -23,7 +23,7 @@ func (ctrl Controllers) RegisterUserHandler(w http.ResponseWriter, r *http.Reque
 
 	err := helpers.ReadJSON(w, r, &input)
 	if err != nil {
-		ctrl.errors.BadRequestResponse(w, r, err)
+		h.errors.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -39,141 +39,141 @@ func (ctrl Controllers) RegisterUserHandler(w http.ResponseWriter, r *http.Reque
 
 	err = user.Password.Set(input.Password)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if data.ValidateUser(v, user); !v.Valid() {
-		ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+		h.errors.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	err = ctrl.models.Users.Insert(r.Context(), user)
+	err = h.models.Users.Insert(r.Context(), user)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrDuplicateEmail):
 			v.AddError("email", "a user with this email address already exists")
-			ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+			h.errors.FailedValidationResponse(w, r, v.Errors)
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	err = ctrl.models.Permissions.AddForUser(r.Context(), user.UserID, "movies:read")
+	err = h.models.Permissions.AddForUser(r.Context(), user.UserID, "movies:read")
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
-	token, err := ctrl.models.Tokens.New(r.Context(), user.UserID, 3*24*time.Hour, data.ScopeActivation)
+	token, err := h.models.Tokens.New(r.Context(), user.UserID, 3*24*time.Hour, data.ScopeActivation)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	// Send the welcome email in the background
-	helpers.Background(ctrl.logger, ctrl.wg, func() {
+	helpers.Background(h.logger, h.wg, func() {
 		data := map[string]interface{}{
 			"activationToken": token.Plaintext,
 			"userID":          user.UserID,
 		}
-		err = ctrl.mailer.Send(user.Email, "user_welcome.tmpl", data)
+		err = h.mailer.Send(user.Email, "user_welcome.tmpl", data)
 		if err != nil {
-			ctrl.logger.Error(err)
+			h.logger.Error(err)
 		}
 	})
 
 	err = helpers.WriteJSON(w, http.StatusAccepted, helpers.Envelope{"user": user}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (ctrl Controllers) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		TokenPlaintext string `json:"token"`
 	}
 
 	err := helpers.ReadJSON(w, r, &input)
 	if err != nil {
-		ctrl.errors.BadRequestResponse(w, r, err)
+		h.errors.BadRequestResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if data.ValidateTokenPlaintext(v, input.TokenPlaintext); !v.Valid() {
-		ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+		h.errors.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	user, err := ctrl.models.Users.GetForToken(r.Context(), data.ScopeActivation, input.TokenPlaintext)
+	user, err := h.models.Users.GetForToken(r.Context(), data.ScopeActivation, input.TokenPlaintext)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
 			v.AddError("token", "invalid or expired activation token")
-			ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+			h.errors.FailedValidationResponse(w, r, v.Errors)
 			return
 		default:
-			ctrl.errors.BadRequestResponse(w, r, err)
+			h.errors.BadRequestResponse(w, r, err)
 			return
 		}
 	}
 
 	user.IsActive = true
-	err = ctrl.models.Users.Update(r.Context(), user)
+	err = h.models.Users.Update(r.Context(), user)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			ctrl.errors.EditConflictResponse(w, r)
+			h.errors.EditConflictResponse(w, r)
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	// If everything went successfully, then we delete all activation tokens for the
 	// user.
-	err = ctrl.models.Tokens.DeleteAllForUser(r.Context(), data.ScopeActivation, user.UserID)
+	err = h.models.Tokens.DeleteAllForUser(r.Context(), data.ScopeActivation, user.UserID)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"user": user}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (ctrl Controllers) ShowUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) ShowUserHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := helpers.ReadUUIDParam(r)
 	if err != nil {
-		ctrl.errors.NotFoundResponse(w, r)
+		h.errors.NotFoundResponse(w, r)
 		return
 	}
 
-	user, err := ctrl.models.Users.Get(r.Context(), id)
+	user, err := h.models.Users.Get(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			ctrl.errors.NotFoundResponse(w, r)
+			h.errors.NotFoundResponse(w, r)
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"user": user}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (ctrl Controllers) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Username  string
 		Email     string
@@ -200,7 +200,7 @@ func (ctrl Controllers) ListUsersHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	if data.ValidateFilters(v, input.Filters); !v.Valid() {
-		ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+		h.errors.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -218,32 +218,32 @@ func (ctrl Controllers) ListUsersHandler(w http.ResponseWriter, r *http.Request)
 		where = append(where, goqu.Ex{"email": input.Email})
 	}
 
-	users, metadata, err := ctrl.models.Users.GetAll(r.Context(), where, input.Filters)
+	users, metadata, err := h.models.Users.GetAll(r.Context(), where, input.Filters)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"metadata": metadata, "users": users}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (ctrl Controllers) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := helpers.ReadUUIDParam(r)
 	if err != nil {
-		ctrl.errors.NotFoundResponse(w, r)
+		h.errors.NotFoundResponse(w, r)
 		return
 	}
 
-	user, err := ctrl.models.Users.Get(r.Context(), id)
+	user, err := h.models.Users.Get(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			ctrl.errors.NotFoundResponse(w, r)
+			h.errors.NotFoundResponse(w, r)
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -257,7 +257,7 @@ func (ctrl Controllers) UpdateUserHandler(w http.ResponseWriter, r *http.Request
 
 	err = helpers.ReadJSON(w, r, &input)
 	if err != nil {
-		ctrl.errors.BadRequestResponse(w, r, err)
+		h.errors.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -277,47 +277,47 @@ func (ctrl Controllers) UpdateUserHandler(w http.ResponseWriter, r *http.Request
 	v := validator.New()
 
 	if data.ValidateEmail(v, input.Email); !v.Valid() {
-		ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+		h.errors.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	err = ctrl.models.Users.Update(r.Context(), user)
+	err = h.models.Users.Update(r.Context(), user)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			ctrl.errors.EditConflictResponse(w, r)
+			h.errors.EditConflictResponse(w, r)
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"user": user}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (ctrl Controllers) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := helpers.ReadUUIDParam(r)
 	if err != nil {
-		ctrl.errors.NotFoundResponse(w, r)
+		h.errors.NotFoundResponse(w, r)
 		return
 	}
 
-	err = ctrl.models.Users.Delete(r.Context(), id)
+	err = h.models.Users.Delete(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			ctrl.errors.NotFoundResponse(w, r)
+			h.errors.NotFoundResponse(w, r)
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "user successfully deleted"}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 	}
 }

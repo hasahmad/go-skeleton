@@ -1,4 +1,4 @@
-package controllers
+package handlers
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	"github.com/hasahmad/go-skeleton/internal/validator"
 )
 
-func (ctrl Controllers) CreateAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (h Handlers) CreateAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -18,7 +18,7 @@ func (ctrl Controllers) CreateAuthenticationTokenHandler(w http.ResponseWriter, 
 
 	err := helpers.ReadJSON(w, r, &input)
 	if err != nil {
-		ctrl.errors.BadRequestResponse(w, r, err)
+		h.errors.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -27,42 +27,42 @@ func (ctrl Controllers) CreateAuthenticationTokenHandler(w http.ResponseWriter, 
 	data.ValidatePasswordPlaintext(v, input.Password)
 
 	if !v.Valid() {
-		ctrl.errors.FailedValidationResponse(w, r, v.Errors)
+		h.errors.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	user, err := ctrl.models.Users.GetByEmail(r.Context(), input.Email)
+	user, err := h.models.Users.GetByEmail(r.Context(), input.Email)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			ctrl.errors.InvalidCredentialsResponse(w, r)
+			h.errors.InvalidCredentialsResponse(w, r)
 			return
 		default:
-			ctrl.errors.ServerErrorResponse(w, r, err)
+			h.errors.ServerErrorResponse(w, r, err)
 			return
 		}
 	}
 
 	match, err := user.Password.Matches(input.Password)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	if !match {
-		ctrl.errors.InvalidCredentialsResponse(w, r)
+		h.errors.InvalidCredentialsResponse(w, r)
 		return
 	}
 
-	token, err := ctrl.models.Tokens.New(r.Context(), user.UserID, 24*time.Hour, data.ScopeAuthentication)
+	token, err := h.models.Tokens.New(r.Context(), user.UserID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"authentication_token": token}, nil)
 	if err != nil {
-		ctrl.errors.ServerErrorResponse(w, r, err)
+		h.errors.ServerErrorResponse(w, r, err)
 		return
 	}
 }

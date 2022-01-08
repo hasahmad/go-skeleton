@@ -1,4 +1,4 @@
-package controllers
+package handlers
 
 import (
 	"sync"
@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Controllers struct {
+type Handlers struct {
 	logger *logrus.Logger
 	cfg    config.Config
 	errors apierrors.ErrorResponses
@@ -26,8 +26,8 @@ func New(
 	models data.Models,
 	mailer mailer.Mailer,
 	wg sync.WaitGroup,
-) Controllers {
-	return Controllers{
+) Handlers {
+	return Handlers{
 		logger: logger,
 		cfg:    cfg,
 		errors: errors,
