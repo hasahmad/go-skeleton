@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/hasahmad/go-skeleton/internal/data"
-	"github.com/hasahmad/go-skeleton/internal/mailer"
+	"github.com/hasahmad/go-skeleton/internal"
+	"github.com/hasahmad/go-skeleton/internal/config"
 	"github.com/jmoiron/sqlx"
 
 	log "github.com/sirupsen/logrus"
@@ -27,68 +26,12 @@ var (
 	buildTime string
 )
 
-type config struct {
-	port int
-	env  string
-	db   struct {
-		dsn          string
-		maxOpenConns int
-		maxIdleConns int
-		maxIdleTime  string
-	}
-	// rps = requests-per-second
-	// enable/disable rate limiting altogether
-	limiter struct {
-		rps     float64
-		burst   int
-		enabled bool
-	}
-	smtp struct {
-		host     string
-		port     int
-		username string
-		password string
-		sender   string
-	}
-	cors struct {
-		trustedOrigins []string
-	}
-}
-
-type application struct {
-	config config
-	logger *log.Logger
-	models data.Models
-	mailer mailer.Mailer
-	wg     sync.WaitGroup
-}
-
 func main() {
-	var cfg config
-
-	flag.IntVar(&cfg.port, "port", 4000, "API server port")
-	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
-
-	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("DB_DSN"), "PostgreSQL DSN")
-	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
-	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
-	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
-
-	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
-	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
-	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
-
-	flag.StringVar(&cfg.smtp.host, "smtp-host", "localhost", "SMTP host")
-	flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP Port")
-	flag.StringVar(&cfg.smtp.username, "smtp-user", "", "SMTP username")
-	flag.StringVar(&cfg.smtp.password, "smtp-pass", "", "SMTP password")
-	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "GO Skeleton <no-reply@hasahmad.github.io>", "SMTP sender")
-
-	cfg.cors.trustedOrigins = []string{}
-	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(s string) error {
-		cfg.cors.trustedOrigins = strings.Split(s, " ")
-		return nil
-	})
+	cfg, err := config.InitByFlag()
+	if err != nil {
+		fmt.Errorf("sdf %s", err.Error())
+		os.Exit(0)
+	}
 
 	displayVersion := flag.Bool("version", false, "Display version and exit")
 
@@ -105,7 +48,7 @@ func main() {
 	logger := log.New()
 	logger.SetFormatter(&log.JSONFormatter{})
 
-	db, err := openDB(cfg)
+	db, err := OpenDB(cfg)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -131,29 +74,23 @@ func main() {
 		return time.Now().Unix()
 	}))
 
-	app := &application{
-		config: cfg,
-		logger: logger,
-		models: data.NewModels(db),
-		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
-	}
-
-	err = app.serve()
+	app := internal.NewApplication(logger, cfg, db, sync.WaitGroup{})
+	err = app.Serve()
 	if err != nil {
 		logger.Fatal(err)
 	}
 }
 
-func openDB(cfg config) (*sqlx.DB, error) {
-	db, err := sqlx.Connect("postgres", cfg.db.dsn)
+func OpenDB(cfg config.Config) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", cfg.DB.DSN)
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(cfg.db.maxOpenConns)
-	db.SetMaxIdleConns(cfg.db.maxIdleConns)
+	db.SetMaxOpenConns(cfg.DB.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.DB.MaxIdleConns)
 
-	duration, err := time.ParseDuration(cfg.db.maxIdleTime)
+	duration, err := time.ParseDuration(cfg.DB.MaxIdleTime)
 	if err != nil {
 		return nil, err
 	}

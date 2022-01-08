@@ -24,7 +24,7 @@ confirm:
 ## run/api: run the cmd/api application
 .PHONY: run/api
 run/api:
-	go run ./cmd/api -db-dsn=${DB_DSN} -smtp-port=${SMTP_PORT} -cors-trusted-origins=${TRUSTED_ORIGINS}
+	go run ./cmd/api/main.go -db-dsn=${DB_DSN} -smtp-port=${SMTP_PORT} -cors-trusted-origins=${TRUSTED_ORIGINS}
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/google/uuid"
 	"github.com/hasahmad/go-skeleton/internal/validator"
 	"github.com/jmoiron/sqlx"
 )
@@ -20,12 +21,12 @@ const (
 type Token struct {
 	Plaintext string    `json:"token" db:"-"`
 	Hash      []byte    `json:"-" db:"hash"`
-	UserID    int64     `json:"-" db:"user_id"`
+	UserID    uuid.UUID `json:"-" db:"user_id"`
 	Expiry    time.Time `json:"expiry" db:"expiry"`
 	Scope     string    `json:"-" db:"scope"`
 }
 
-func generateToken(userID int64, ttl time.Duration, scope string) (*Token, error) {
+func generateToken(userID uuid.UUID, ttl time.Duration, scope string) (*Token, error) {
 	token := &Token{
 		UserID: userID,
 		Expiry: time.Now().Add(ttl),
@@ -65,7 +66,7 @@ func NewTokenModel(db *sqlx.DB) TokenModel {
 	}
 }
 
-func (m TokenModel) New(ctx context.Context, userID int64, ttl time.Duration, scope string) (*Token, error) {
+func (m TokenModel) New(ctx context.Context, userID uuid.UUID, ttl time.Duration, scope string) (*Token, error) {
 	token, err := generateToken(userID, ttl, scope)
 	if err != nil {
 		return nil, err
@@ -93,7 +94,7 @@ func (m TokenModel) Insert(ctx context.Context, token *Token) error {
 	return err
 }
 
-func (m TokenModel) DeleteAllForUser(ctx context.Context, scope string, userID int64) error {
+func (m TokenModel) DeleteAllForUser(ctx context.Context, scope string, userID uuid.UUID) error {
 	query, args, err := goqu.
 		Delete(m.tableName).
 		Where(goqu.Ex{
